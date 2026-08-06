@@ -1,0 +1,33 @@
+[versions]
+spring-boot = "4.1.0"
+spring-dependency-management = "1.1.7"
+spring-ai = "2.0.0-M2"
+mapstruct = "1.6.3"
+testcontainers = "1.21.3"
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+
+[libraries]
+spring-boot-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot = { module = "org.springframework.boot:spring-boot-starter" }
+spring-boot-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-kafka = { module = "org.springframework.boot:spring-boot-starter-kafka" }
+spring-jdbc = { module = "org.springframework:spring-jdbc" }
+flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+flyway-postgres = { module = "org.flywaydb:flyway-database-postgresql" }
+postgres = { module = "org.postgresql:postgresql" }
+lombok = { module = "org.projectlombok:lombok" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+spring-ai-ollama = { module = "org.springframework.ai:spring-ai-starter-model-ollama" }
+spring-ai-openai = { module = "org.springframework.ai:spring-ai-starter-model-openai" }
+spring-ai-pgvector = { module = "org.springframework.ai:spring-ai-starter-vector-store-pgvector" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
+mapstruct = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
+mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }

@@ -1,0 +1,20 @@
+%s
+
+REPAIR ATTEMPT %d
+The previous reference solution failed deterministic execution.
+Regenerate the complete task JSON and a complete reference solution.
+Do not repeat the failure. The exact worker error was:
+%s
+
+If the error reports a missing symbol, add its explicit import before the Main class,
+using the package that defines the missing type.
+If the error says the file ended while parsing, reconstruct the full program and close
+every method, loop, conditional, and class. Count opening and closing braces and ensure
+the final source line is `}`.
+If the error is NoSuchElementException, compare every scanner read with the supplied
+test input and make the parser and test input use the same token count and order. Do not
+add reads for missing values.
+Return the complete source, not only the changed lines.
+
+Previous reference source to repair:
+%s

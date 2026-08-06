@@ -1,0 +1,71 @@
+Generate exactly one Java coding task.
+
+Follow the supplied JSON Schema exactly. Return only JSON, with no Markdown or commentary.
+Write natural-language fields in English. All fields must be non-null.
+The description must explain the algorithm's required behavior, input interpretation,
+output format, important edge cases, and the invariant or rule that makes the task
+distinctive. Reuse canonical examples and rules from the supplied algorithm context.
+Generate deterministic test inputs only. The system executes the reference solution to
+derive exact stdout, so do not generate expected outputs.
+Each reference solution must be a complete Java program with
+`public static void main(String[] args)`.
+Every reference solution must declare exactly `public class Main` because the
+judge saves the source as `Main.java` and runs `java Main`.
+Never include a `package` declaration. The source must contain exactly one top-level
+class named `Main`, and its entry point must be `public static void main(String[] args)`.
+The worker runs `javac Main.java` followed by `java Main`; any other class name or package
+is invalid even if the source compiles.
+Return exactly one concise reference solution as an array of source-code lines in
+referenceSolutionLines. Each array item must contain exactly one non-empty source-code
+line; do not emit empty items. Do not include explanations, comments, or alternative implementations.
+The program must read one test case from stdin and write only the result to stdout.
+Read structured input as whitespace-separated tokens with `Scanner.nextInt()`,
+`Scanner.nextLong()`, or `Scanner.next()`. Never use `Scanner.nextLine()` to
+parse task input, because test input may not preserve line boundaries.
+Every type outside `java.lang` must have an explicit import at the top of the source.
+Add the exact import for every referenced type; wildcard imports are allowed but should
+not replace required imports when the source uses specific types. Do not assume that
+packages such as `java.util` are available without imports. Before returning, audit
+every referenced type and verify that its import is present.
+Treat missing-import compiler errors as invalid output before returning. For example,
+using `Scanner`, `List`, `ArrayList`, `Arrays`, or any other type from `java.util`
+requires an appropriate import. Apply the same rule to every non-`java.lang` package.
+The input format in every test case must exactly match the parser in the reference
+solution, including any collection size before collection values.
+Before returning, count every value read from standard input and verify that every
+generated test input supplies those values in the same order. Do not call a scanner
+read when the corresponding token is absent, and do not require an array length,
+pivot, limit, or other parameter unless it is present in the test input.
+Every input value required by the canonical method must be supplied explicitly. Never
+invent a value from the array when the algorithm requires it as a separate parameter;
+for example, a pivot parameter must be present in every test input. Do not replace a
+canonical parameter with a generated helper such as findPivot.
+
+Use this console format for every task:
+- Never print prompts, labels, or debug text.
+- Use whitespace-separated tokens for numbers and arrays.
+- When a collection size is needed, put its count before its values.
+- Print array results as space-separated values on one line, without brackets or commas.
+- Print matrix rows on separate lines.
+- Preserve meaningful spaces inside string values.
+
+Before returning, verify the reference solution is complete and compilable: every opening
+brace has a matching closing brace, every method and class is closed, all referenced types
+are imported, there is no `package` declaration, and the source ends after a complete
+`Main` class. Count opening and closing braces before returning; they must be equal, and
+the last non-empty source line must close the `Main` class with `}`. Keep the solution
+compact and omit comments and blank lines so it fits completely in the response. Never
+stop in the middle of a method, use ellipses, or emit a partial program.
+
+Example test case JSON:
+{"input":"5\n1 2 3 2 5\n"}
+
+If the knowledge context defines a requested algorithm, the task must genuinely require
+its distinctive rules. Align the description, constraints, tests, and solution with it.
+Do not invent or modify those rules.
+
+User prompt:
+%s
+
+Use knowledge context from algorithm below:
+%s

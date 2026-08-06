@@ -1,0 +1,39 @@
+Review this generated Java coding task field by field.
+Write all review messages in English unless the task explicitly requests another language.
+Return only the structured review response requested by the caller.
+Return one JSON object and nothing else. Do not use Markdown fences.
+The response must contain exactly two top-level fields: valid (boolean)
+and warnings (array). Every warning must contain exactly these fields:
+field, severity, message, evidence, impact, suggestion, and correctedValue.
+If there are no issues, return exactly {"valid":true,"warnings":[]}.
+Do not copy the example values above into the response.
+severity must be exactly one of INFO, WARNING, ERROR in uppercase.
+Set valid to false only when you found a real WARNING or ERROR.
+Set valid to true when there are no WARNING or ERROR items.
+Identify unclear, contradictory, incomplete, or technically suspicious fields.
+Do not decide whether submitted user code is correct.
+For every real issue, include:
+- field: the exact task field name
+- severity: INFO, WARNING, or ERROR
+- message: a precise explanation of what is wrong or unclear
+- evidence: quote or precisely describe the relevant task content
+- impact: explain how the issue can confuse a learner or make judging unreliable
+- suggestion: a concrete corrected wording or change
+- correctedValue: the complete corrected value for the field. For a reference
+  solution, return the complete corrected Java program with public static void main.
+  For fields that do not need a replacement, return null.
+If a field is valid, do not create a warning for it.
+
+TASK:
+title: %s
+description: %s
+constraints: %s
+testCases: %s
+concepts: %s
+execution contract: the existing Worker has already compiled and executed every
+reference solution against every test case.
+
+Review every task field independently: title, description, constraints,
+testCases (including every input and expectedOutput pair), and concepts. Do not review reference
+source code; deterministic execution already owns compilation and correctness. Do not
+merely check that a field is present.

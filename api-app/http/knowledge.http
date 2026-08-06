@@ -1,0 +1,14 @@
+### Create a knowledge document and index its chunks
+POST {{host}}/api/knowledge
+Content-Type: multipart/form-data; boundary=KnowledgeBoundary
+
+--KnowledgeBoundary
+Content-Disposition: form-data; name="file"; filename="sliding-window.md"
+Content-Type: text/markdown
+
+< ../src/main/resources/knowledge/fictional/tide-compress.md
+--KnowledgeBoundary--
+
+### Get a knowledge document
+GET {{host}}/api/knowledge/{{knowledgeDocumentId}}
+Accept: application/json

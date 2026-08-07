@@ -1,0 +1,9 @@
+repo_root=$(git rev-parse --show-toplevel)
+commitlint="$repo_root/node_modules/.bin/commitlint"
+
+if [ ! -x "$commitlint" ]; then
+  echo "Commitlint is not installed. Run 'npm install' from the repository root, then retry the commit."
+  exit 1
+fi
+
+"$commitlint" --edit "$1"

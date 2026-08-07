@@ -13,6 +13,7 @@ node_modules/
 web/node_modules/
 web/dist/
 web/.vite/
+*.tsbuildinfo
 
 # Playwright output
 web/test-results/

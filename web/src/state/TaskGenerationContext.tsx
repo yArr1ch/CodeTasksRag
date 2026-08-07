@@ -3,7 +3,7 @@ import {useMutation} from '@tanstack/react-query';
 import {TaskGenerationResult, tasksApi} from '../api/taskApi';
 
 type GenerationDecision = 'CHECK' | 'CONTINUE';
-type GenerationVariables = {prompt: string; decision: GenerationDecision};
+type GenerationVariables = { prompt: string; decision: GenerationDecision };
 
 type TaskGenerationContextValue = {
     prompt: string;
@@ -16,7 +16,7 @@ type TaskGenerationContextValue = {
 
 const TaskGenerationContext = createContext<TaskGenerationContextValue | null>(null);
 
-export function TaskGenerationProvider({children}: {children: React.ReactNode}) {
+export function TaskGenerationProvider({children}: { children: React.ReactNode }) {
     const [prompt, setPrompt] = useState('');
     const [generation, setGeneration] = useState<TaskGenerationResult>();
     const mutation = useMutation({

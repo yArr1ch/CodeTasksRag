@@ -1,0 +1,4 @@
+# GHSA-qwww-vcr4-c8h2 affects React Router's unstable RSC APIs only.
+# AlgoCoach uses BrowserRouter, Routes, Route, Link, useNavigate, and useParams;
+# it does not use the unstable RSC APIs covered by this advisory.
+GHSA-qwww-vcr4-c8h2

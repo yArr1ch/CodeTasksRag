@@ -7,12 +7,14 @@ import './styles.css';
 import {TaskGenerationProvider} from './state/TaskGenerationContext';
 
 const client = new QueryClient({defaultOptions: {queries: {staleTime: 30_000, retry: 1}}});
-createRoot(document.getElementById('root')!).render(<StrictMode>
-    <QueryClientProvider client={client}>
-        <BrowserRouter>
-            <TaskGenerationProvider>
-                <App/>
-            </TaskGenerationProvider>
-        </BrowserRouter>
-    </QueryClientProvider>
-</StrictMode>);
+createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+        <QueryClientProvider client={client}>
+            <BrowserRouter>
+                <TaskGenerationProvider>
+                    <App/>
+                </TaskGenerationProvider>
+            </BrowserRouter>
+        </QueryClientProvider>
+    </StrictMode>
+);

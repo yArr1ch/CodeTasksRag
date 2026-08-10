@@ -15,6 +15,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend || steps.manual.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend || steps.manual.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker || steps.manual.outputs.docker }}
+
+    steps:
+      - name: Filter pull request paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            gradle: &gradle_paths
+              - 'gradle/**'
+              - 'gradlew'
+              - 'gradle.properties'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+            back: &back_paths
+              - 'api-app/**'
+              - 'worker-app/**'
+              - 'shared-contracts/**'
+
+            backend:
+              - *back_paths
+              - *gradle_paths
+            frontend:
+              - 'web/**'
+            docker:
+              - 'Dockerfile*'
+              - *back_paths
+              - *gradle_paths
+
+      - name: Run all areas for manual dispatch
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          {
+            echo "backend=true"
+            echo "frontend=true"
+            echo "docker=true"
+          } >> "$GITHUB_OUTPUT"
+
   security:
     name: Security and quality checks
     runs-on: ubuntu-latest
@@ -56,6 +105,8 @@ jobs:
 
       - name: Lint GitHub Actions workflows
         uses: raven-actions/actionlint@v2
+        with:
+          files: .github/workflows/*.yml,.github/workflows/*.yaml
 
       - name: Set up Node.js for commitlint
         if: github.event_name == 'pull_request'
@@ -85,6 +136,8 @@ jobs:
   backend:
     name: Backend unit and container tests
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
 
     steps:
       - name: Check out repository
@@ -106,6 +159,8 @@ jobs:
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
 
     steps:
       - name: Check out repository
@@ -129,7 +184,8 @@ jobs:
   frontend-e2e:
     name: Frontend Playwright smoke tests
     runs-on: ubuntu-latest
-    needs: frontend
+    needs: [changes, frontend]
+    if: needs.changes.outputs.frontend == 'true' && needs.frontend.result == 'success'
 
     steps:
       - name: Check out repository
@@ -165,7 +221,12 @@ jobs:
   docker:
     name: Build Docker images
     runs-on: ubuntu-latest
-    needs: [backend, frontend, frontend-e2e, security, codeql]
+    needs: [changes, backend, frontend, frontend-e2e, security, codeql]
+    if: >-
+      always() &&
+      needs.changes.outputs.docker == 'true' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
 
     steps:
       - name: Check out repository
@@ -254,12 +315,21 @@ jobs:
       - name: Enforce image vulnerability policy
         if: always()
         run: |
-          test "${{ steps.trivy-api.outcome }}" = success
-          test "${{ steps.trivy-worker.outcome }}" = success
+          api_outcome="${{ steps.trivy-api.outcome }}"
+          worker_outcome="${{ steps.trivy-worker.outcome }}"
+          echo "API image Trivy outcome: $api_outcome"
+          echo "Worker image Trivy outcome: $worker_outcome"
+
+          if [ "$api_outcome" != success ] || [ "$worker_outcome" != success ]; then
+            echo "::error::A fixed HIGH or CRITICAL vulnerability was found in an image. Review the Trivy scan summaries and uploaded SARIF reports."
+            exit 1
+          fi
 
   codeql:
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
       security-events: write

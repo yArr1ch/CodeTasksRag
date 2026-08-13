@@ -3,53 +3,53 @@ POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved AsterFold algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved AsterFold algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate an OrbitMerge task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved OrbitMerge algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved OrbitMerge algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate a SpiralLatch task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved SpiralLatch algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved SpiralLatch algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate a BeaconWindow task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved BeaconWindow algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved BeaconWindow algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate an EchoPartition task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved EchoPartition algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved EchoPartition algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate a PrismSelect task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved PrismSelect algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved PrismSelect algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate a TideCompress task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved TideCompress algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved TideCompress algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}
 
 ### Generate a RingShift task
 POST {{host}}/api/tasks/generate
 Content-Type: application/json
 Accept: application/json
 
-{"prompt":"Create a Java coding task that requires the retrieved RingShift algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution.","decision":"CONTINUE"}
+{"prompt":"Create a Java coding task that requires the retrieved RingShift algorithm. Do not merely mention it; make its distinctive rules necessary for a correct solution."}

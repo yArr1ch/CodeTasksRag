@@ -16,3 +16,11 @@ export async function post<T>(path: string, body?: unknown) {
 export async function patch<T>(path: string, body?: unknown) {
     return (await http.patch<T>(path, body)).data;
 }
+
+export async function upload<T>(path: string, file: File) {
+    const body = new FormData();
+    body.append('file', file);
+    return (await http.post<T>(path, body, {
+        headers: {'Content-Type': 'multipart/form-data'}
+    })).data;
+}

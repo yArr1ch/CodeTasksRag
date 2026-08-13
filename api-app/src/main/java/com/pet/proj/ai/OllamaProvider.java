@@ -11,22 +11,33 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "spring.ai.model.chat", havingValue = "ollama", matchIfMissing = true)
-public class OllamaProvider implements AiProvider {
-    private final ChatClient.Builder client;
+public final class OllamaProvider implements AiProvider {
+
+    private final ChatClient.Builder chatClientBuilder;
     private final ObjectMapper json;
 
-    public <T> T generate(String prompt, Class<T> responseType) {
+    @Override
+    public <T> T generate(String prompt, Class<T> responseType, double temperature) {
+        var converter = new BeanOutputConverter<>(responseType, json);
+        var options = OllamaChatOptions.builder()
+                .outputSchema(converter.getJsonSchema())
+                .temperature(temperature)
+                .build();
+
+        var request = chatClientBuilder.build()
+                .prompt()
+                .user(prompt)
+                .options(options);
+
         try {
-            var converter = new BeanOutputConverter<>(responseType, json);
-            return client.build().prompt().user(prompt)
-                    .options(OllamaChatOptions.builder()
-                            .outputSchema(converter.getJsonSchema())
-                            .build())
-                    .call()
-                    .entity(converter);
+            var response = request.call();
+            return response.entity(converter);
         } catch (Exception e) {
-            var reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            throw new IllegalStateException("Ollama returned an invalid structured response: " + reason, e);
+            throw new AiGenerationException("AI generation failed: " + reason(e), e);
         }
+    }
+
+    private String reason(Throwable failure) {
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
     }
 }

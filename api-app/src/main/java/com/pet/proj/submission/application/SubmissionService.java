@@ -33,7 +33,6 @@ public class SubmissionService {
 
     @Value("${app.kafka.topics.submission-created}")
     private String submissionCreatedTopic;
-    private final ConcurrentHashMap<UUID, CompletableFuture<Submission>> pending = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CompletableFuture<ReferenceExecutionResult>> referenceExecutions = new ConcurrentHashMap<>();
 
     public Submission submit(UUID taskId, String sourceCode) {
@@ -44,15 +43,17 @@ public class SubmissionService {
                 .status(SubmissionStatus.QUEUED)
                 .build());
         var correlationId = UUID.randomUUID();
-        var response = new CompletableFuture<Submission>();
-        pending.put(correlationId, response);
 
         submissionEvents.send(
                 submissionCreatedTopic,
                 correlationId.toString(),
                 new SubmissionCreatedEvent(correlationId, saved.getId(), taskId)
-        );
-        return awaitResult(correlationId, response, saved);
+        ).whenComplete((_, error) -> {
+            if (error != null) {
+                markQueueFailure(saved.getId(), error);
+            }
+        });
+        return submissionMapper.toDomain(saved);
     }
 
     public Submission get(UUID id) {
@@ -61,7 +62,11 @@ public class SubmissionService {
 
     public List<Submission> validateReferenceSolutions(UUID taskId, List<String> referenceSolutions) {
         return referenceSolutions.stream()
-                .map(sourceCode -> submit(taskId, sourceCode))
+                .map(sourceCode -> {
+                    var result = executeReferenceSolution(taskId, sourceCode);
+                    var status = result.passed() ? SubmissionStatus.PASSED : SubmissionStatus.FAILED;
+                    return new Submission(null, taskId, sourceCode, status, 0, 0, result.error());
+                })
                 .toList();
     }
 
@@ -81,27 +86,30 @@ public class SubmissionService {
                 correlationId.toString(),
                 new SubmissionCreatedEvent(correlationId, saved.getId(), taskId,
                         SubmissionCreatedEvent.REFERENCE_ORACLE)
-        );
-        log.info(
-                "Reference oracle queued, taskId={}, submissionId={}, correlationId={}",
+        ).whenComplete((_, error) -> {
+            if (error != null) {
+                markQueueFailure(saved.getId(), error);
+                referenceExecutions.computeIfPresent(correlationId, (_, pending) -> {
+                    pending.complete(new ReferenceExecutionResult(
+                            false, List.of(), "reference solution could not be queued"));
+                    return pending;
+                });
+            }
+        });
+        log.info("Reference oracle queued, taskId={}, submissionId={}, correlationId={}",
                 taskId, saved.getId(), correlationId);
-
         return awaitReferenceExecution(correlationId, response);
     }
 
     @KafkaListener(topics = "${app.kafka.topics.submission-completed}", groupId = "algocoach-api")
     public void receive(SubmissionCompletedEvent event) {
-        if (SubmissionCreatedEvent.REFERENCE_ORACLE.equals(event.executionMode())) {
-            referenceExecutions.computeIfPresent(event.correlationId(), (_, response) -> {
-                response.complete(new ReferenceExecutionResult(
-                        SubmissionStatus.PASSED.name().equals(event.status()),
-                        event.outputs(), event.error()));
-                return response;
-            });
+        if (!SubmissionCreatedEvent.REFERENCE_ORACLE.equals(event.executionMode())) {
             return;
         }
-        pending.computeIfPresent(event.correlationId(), (_, response) -> {
-            response.complete(submissionMapper.toDomain(getSubmissionEntity(event.submissionId())));
+        referenceExecutions.computeIfPresent(event.correlationId(), (_, response) -> {
+            response.complete(new ReferenceExecutionResult(
+                    SubmissionStatus.PASSED.name().equals(event.status()),
+                    event.outputs(), event.error()));
             return response;
         });
     }
@@ -111,8 +119,17 @@ public class SubmissionService {
                 .orElseThrow(() -> new NoSuchElementException("submission not found"));
     }
 
-    private ReferenceExecutionResult awaitReferenceExecution(
-            UUID id, CompletableFuture<ReferenceExecutionResult> response) {
+    private void markQueueFailure(UUID submissionId, Throwable error) {
+        submissions.findById(submissionId).ifPresent(submission -> {
+            if (submission.getStatus() == SubmissionStatus.QUEUED) {
+                submission.setStatus(SubmissionStatus.FAILED);
+                submission.setError("submission could not be queued: " + error.getMessage());
+                submissions.save(submission);
+            }
+        });
+    }
+
+    private ReferenceExecutionResult awaitReferenceExecution(UUID id, CompletableFuture<ReferenceExecutionResult> response) {
         try {
             return response.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
                     .whenComplete((_, _) -> referenceExecutions.remove(id))
@@ -124,16 +141,5 @@ public class SubmissionService {
     }
 
     public record ReferenceExecutionResult(boolean passed, List<String> outputs, String error) {
-    }
-
-    private Submission awaitResult(UUID id, CompletableFuture<Submission> response, SubmissionEntity queued) {
-        try {
-            return response.orTimeout(RESPONSE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
-                    .whenComplete((_, _) -> pending.remove(id))
-                    .join();
-        } catch (Exception e) {
-            pending.remove(id);
-            return submissionMapper.toDomain(queued);
-        }
     }
 }

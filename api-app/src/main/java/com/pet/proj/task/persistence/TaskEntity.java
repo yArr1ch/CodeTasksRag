@@ -52,15 +52,25 @@ public class TaskEntity {
     @Column(nullable = false)
     private int version;
 
-    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TaskStatus status;
 
-    public void setTitle(String title) { this.title = title; }
-    public void setDescription(String description) { this.description = description; }
-    public void setConstraints(JsonNode constraints) { this.constraints = constraints; }
-    public void setReferenceSolutions(JsonNode referenceSolutions) { this.referenceSolutions = referenceSolutions; }
     public void setTestCases(JsonNode testCases) { this.testCases = testCases; }
-    public void setConcepts(JsonNode concepts) { this.concepts = concepts; }
+
+    public void publish() {
+        requireDraft("published");
+        status = TaskStatus.PUBLISHED;
+    }
+
+    public void reject() {
+        requireDraft("rejected");
+        status = TaskStatus.REJECTED;
+    }
+
+    private void requireDraft(String action) {
+        if (status != TaskStatus.DRAFT) {
+            throw new IllegalStateException("only DRAFT tasks can be " + action);
+        }
+    }
 }

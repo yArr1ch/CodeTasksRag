@@ -1,20 +1,25 @@
-%s
+Repair only the reference solution source code. Do not regenerate the task, description,
+constraints, concepts, test cases, or expected outputs.
+
+Task title: %s
+Task description: %s
+Constraints: %s
 
 REPAIR ATTEMPT %d
 The previous reference solution failed deterministic execution.
-Regenerate the complete task JSON and a complete reference solution.
-Do not repeat the failure. The exact worker error was:
+The exact compiler or runtime error was:
 %s
 
-If the error reports a missing symbol, add its explicit import before the Main class,
-using the package that defines the missing type.
-If the error says the file ended while parsing, reconstruct the full program and close
-every method, loop, conditional, and class. Count opening and closing braces and ensure
-the final source line is `}`.
-If the error is NoSuchElementException, compare every scanner read with the supplied
-test input and make the parser and test input use the same token count and order. Do not
-add reads for missing values.
-Return the complete source, not only the changed lines.
-
-Previous reference source to repair:
+Previous reference source:
 %s
+
+Return only the complete corrected Java source as JSON matching the supplied schema:
+{"sourceCodeLines":["line 1","line 2"]}
+
+The source must be saved as Main.java and run with `javac Main.java` followed by
+`java Main`. It must contain exactly `public class Main`, a complete
+`public static void main(String[] args)`, no package declaration, and all required
+imports before the class. If a symbol is missing, add its exact explicit import.
+If parsing failed, close every method, conditional, loop, and class. If input parsing
+failed, make the parser match the existing test input; do not change the test input.
+Return every source line, not a patch, explanation, or partial program.

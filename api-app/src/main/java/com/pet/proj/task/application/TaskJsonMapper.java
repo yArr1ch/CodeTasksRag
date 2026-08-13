@@ -3,6 +3,7 @@ package com.pet.proj.task.application;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pet.proj.task.api.TaskGenerationResult;
 import com.pet.proj.task.domain.Task;
 import lombok.RequiredArgsConstructor;
 import org.mapstruct.Named;
@@ -25,6 +26,14 @@ public class TaskJsonMapper {
     public List<Task.TestCase> toTestCases(JsonNode value) {
         return mapper.convertValue(value, new TypeReference<>() {
         });
+    }
+
+    @Named("similarTasks")
+    public List<TaskGenerationResult.SimilarTask> toSimilarTasks(JsonNode value) {
+        return value == null
+                ? List.of()
+                : mapper.convertValue(value, new TypeReference<>() {
+                });
     }
 
     @Named("text")

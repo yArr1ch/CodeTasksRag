@@ -34,6 +34,13 @@ public class SemanticSearchService {
         vectorStore.add(documents);
     }
 
+    public void replace(String filter, List<Document> documents) {
+        vectorStore.delete(filter);
+        if (!documents.isEmpty()) {
+            vectorStore.add(documents);
+        }
+    }
+
     public double score(Document document) {
         if (document.getScore() != null) {
             return document.getScore();

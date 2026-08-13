@@ -4,7 +4,7 @@ Return only the structured review response requested by the caller.
 Return one JSON object and nothing else. Do not use Markdown fences.
 The response must contain exactly two top-level fields: valid (boolean)
 and warnings (array). Every warning must contain exactly these fields:
-field, severity, message, evidence, impact, suggestion, and correctedValue.
+field, severity, message, evidence, impact, and suggestion.
 If there are no issues, return exactly {"valid":true,"warnings":[]}.
 Do not copy the example values above into the response.
 severity must be exactly one of INFO, WARNING, ERROR in uppercase.
@@ -19,9 +19,6 @@ For every real issue, include:
 - evidence: quote or precisely describe the relevant task content
 - impact: explain how the issue can confuse a learner or make judging unreliable
 - suggestion: a concrete corrected wording or change
-- correctedValue: the complete corrected value for the field. For a reference
-  solution, return the complete corrected Java program with public static void main.
-  For fields that do not need a replacement, return null.
 If a field is valid, do not create a warning for it.
 
 TASK:

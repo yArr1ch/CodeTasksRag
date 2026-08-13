@@ -1,10 +1,9 @@
 package com.pet.proj.task.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pet.proj.ai.AiProvider;
+import com.pet.proj.ai.OllamaProvider;
 import com.pet.proj.coaching.application.KnowledgeDocumentService;
 import com.pet.proj.submission.application.SubmissionService;
-import com.pet.proj.task.api.TaskCorrectionRequest;
 import com.pet.proj.task.domain.Task;
 import com.pet.proj.task.domain.TaskStatus;
 import com.pet.proj.task.persistence.TaskEntity;
@@ -23,7 +22,6 @@ import java.util.concurrent.ExecutorService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,11 +29,13 @@ class TaskServiceTest {
     @Mock
     private TaskRepository taskRepository;
     @Mock
-    private AiProvider aiProvider;
+    private OllamaProvider aiProvider;
     @Mock
     private TaskSimilarityService similarityService;
     @Mock
     private TaskMapper taskMapper;
+    @Mock
+    private TaskSolutionService solutions;
     @Mock
     private KnowledgeDocumentService knowledgeDocuments;
     @Mock
@@ -47,45 +47,54 @@ class TaskServiceTest {
     private TaskService taskService;
 
     @Test
-    void applyCorrection_draftDescription_updatesTask() {
-        var taskId = UUID.randomUUID();
-        var task = draftTask();
-        var correctedTask = new Task(
-                taskId, "Task", "Updated description", List.of(), List.of(), TaskStatus.DRAFT);
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
-        when(taskMapper.toDomain(task)).thenReturn(correctedTask);
+    void publishIndexesDraftAndRejectRemovesDraftFromIndexes() {
+        var publishId = UUID.randomUUID();
+        var publishTask = draftTask(publishId);
+        when(taskRepository.findById(publishId)).thenReturn(Optional.of(publishTask));
 
-        var result = taskService.applyCorrection(
-                taskId, new TaskCorrectionRequest("description", "Updated description"));
+        taskService.publish(publishId);
 
-        assertThat(result).isEqualTo(correctedTask);
-        assertThat(task.getDescription()).isEqualTo("Updated description");
-        verify(taskMapper).toDomain(task);
+        assertThat(publishTask.getStatus()).isEqualTo(TaskStatus.PUBLISHED);
+        verify(similarityService).index(publishTask);
+        verify(solutions).indexPublishedTask(publishTask);
+
+        var rejectId = UUID.randomUUID();
+        var rejectTask = draftTask(rejectId);
+        when(taskRepository.findById(rejectId)).thenReturn(Optional.of(rejectTask));
+
+        taskService.reject(rejectId);
+
+        assertThat(rejectTask.getStatus()).isEqualTo(TaskStatus.REJECTED);
+        verify(similarityService).remove(rejectId);
+        verify(solutions).remove(rejectId);
     }
 
     @Test
-    void applyCorrection_publishedTask_rejectsCorrection() {
+    void publishingAlreadyPublishedTaskFails() {
         var taskId = UUID.randomUUID();
-        var task = draftTask();
-        task.setStatus(TaskStatus.PUBLISHED);
+        var task = draftTask(taskId);
+        task.publish();
         when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
 
-        assertThatThrownBy(() -> taskService.applyCorrection(
-                taskId, new TaskCorrectionRequest("description", "Updated description")))
+        assertThatThrownBy(() -> taskService.publish(taskId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("only draft tasks can be corrected");
-        verifyNoInteractions(taskMapper);
+                .hasMessage("only DRAFT tasks can be published");
     }
 
     private TaskEntity draftTask() {
+        return draftTask(UUID.randomUUID());
+    }
+
+    private TaskEntity draftTask(UUID id) {
         var mapper = new ObjectMapper();
         return TaskEntity.builder()
+                .id(id)
                 .title("Task")
                 .description("Original description")
                 .constraints(mapper.createArrayNode())
                 .generatedByAi(true)
-                .referenceSolutions(mapper.createArrayNode())
-                .testCases(mapper.createArrayNode())
+                .referenceSolutions(mapper.valueToTree(List.of("class Main {}")))
+                .testCases(mapper.valueToTree(List.of(new Task.TestCase("0", "0"))))
                 .concepts(mapper.createArrayNode())
                 .status(TaskStatus.DRAFT)
                 .build();

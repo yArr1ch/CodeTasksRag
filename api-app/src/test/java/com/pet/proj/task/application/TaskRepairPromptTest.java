@@ -12,12 +12,17 @@ class TaskRepairPromptTest {
                 "public class Main {}"
         );
 
-        var prompt = new TaskRepairPrompt("base task prompt", failure, 2).render();
+        var prompt = new TaskRepairPrompt(
+                "Echo task",
+                "Rearrange the values.",
+                java.util.List.of("Keep the result stable."),
+                failure,
+                2).render();
 
         assertThat(prompt)
                 .contains("REPAIR ATTEMPT 2")
                 .contains("cannot find symbol")
                 .contains("public class Main {}")
-                .contains("Return the complete source");
+                .contains("Return every source line");
     }
 }

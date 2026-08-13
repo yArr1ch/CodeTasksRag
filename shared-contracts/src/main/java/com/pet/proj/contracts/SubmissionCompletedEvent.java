@@ -8,11 +8,6 @@ public record SubmissionCompletedEvent(UUID eventId, int schemaVersion, UUID cor
                                        UUID submissionId, UUID taskId, String status, int passedTests,
                                        int totalTests, String error, String executionMode,
                                        List<String> outputs, Instant completedAt) {
-    public SubmissionCompletedEvent(UUID correlationId, UUID submissionId, UUID taskId, String status,
-                                     int passedTests, int totalTests, String error) {
-        this(correlationId, submissionId, taskId, status, passedTests, totalTests, error,
-                SubmissionCreatedEvent.STANDARD, List.of());
-    }
 
     public SubmissionCompletedEvent(UUID correlationId, UUID submissionId, UUID taskId, String status,
                                     int passedTests, int totalTests, String error, String executionMode,

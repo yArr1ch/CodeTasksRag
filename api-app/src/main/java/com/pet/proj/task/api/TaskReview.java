@@ -8,8 +8,7 @@ public record TaskReview(boolean valid, @NotNull @Valid List<FieldWarning> warni
     public TaskReview { warnings = List.copyOf(warnings == null ? List.of() : warnings); }
 
     public record FieldWarning(String field, Severity severity, String message,
-                               String evidence, String impact, String suggestion,
-                               String correctedValue) {
+                               String evidence, String impact, String suggestion) {
         public enum Severity { INFO, WARNING, ERROR }
     }
 }

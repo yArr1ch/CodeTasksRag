@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pet.proj.contracts.SubmissionCreatedEvent;
 import com.pet.proj.contracts.SubmissionCompletedEvent;
+import com.pet.proj.submission.domain.SubmissionStatus;
 import com.pet.proj.worker.execution.CodeExecutor;
 import com.pet.proj.submission.persistence.SubmissionRepository;
 import com.pet.proj.task.persistence.TaskRepository;
@@ -35,12 +36,36 @@ public class SubmissionWorker {
                 "Processing submission, taskId={}, submissionId={}, mode={}, correlationId={}",
                 event.taskId(), event.submissionId(), event.executionMode(), event.correlationId());
         var submission = submissionRepository.findById(event.submissionId()).orElseThrow();
-        var task = taskRepository.findById(event.taskId()).orElseThrow();
-        var testCases = json.convertValue(task.getTestCases(), new TypeReference<List<CodeExecutor.TestCase>>() {
-        });
-        var result = executor.execute(new CodeExecutor.ExecutionRequest(
-                submission.getSourceCode(), testCases,
-                SubmissionCreatedEvent.REFERENCE_ORACLE.equals(event.executionMode())));
+        if (submission.getStatus() != SubmissionStatus.QUEUED) {
+            log.info("Skipping already processed submissionId={}, status={}",
+                    submission.getId(), submission.getStatus());
+            return;
+        }
+
+        if (submissionRepository.claimForExecution(
+                submission.getId(), SubmissionStatus.QUEUED, SubmissionStatus.RUNNING) == 0) {
+            log.info("Submission was claimed by another worker, submissionId={}", submission.getId());
+            return;
+        }
+        submission.setStatus(SubmissionStatus.RUNNING);
+
+        CodeExecutor.ExecutionResult result;
+        try {
+            var task = taskRepository.findById(event.taskId()).orElseThrow();
+            var testCases = json.convertValue(task.getTestCases(), new TypeReference<List<CodeExecutor.TestCase>>() {
+            });
+            result = executor.execute(new CodeExecutor.ExecutionRequest(
+                    submission.getSourceCode(), testCases,
+                    SubmissionCreatedEvent.REFERENCE_ORACLE.equals(event.executionMode())));
+        } catch (Exception exception) {
+            log.error("Submission execution failed, submissionId={}", submission.getId(), exception);
+            result = new CodeExecutor.ExecutionResult(
+                    SubmissionStatus.FAILED,
+                    0,
+                    0,
+                    exception.getMessage() == null ? "submission execution failed" : exception.getMessage(),
+                    List.of());
+        }
 
         submission.setStatus(result.status());
         submission.setPassedTests(result.passedTests());

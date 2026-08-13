@@ -12,3 +12,7 @@ Content-Type: text/markdown
 ### Get a knowledge document
 GET {{host}}/api/knowledge/{{knowledgeDocumentId}}
 Accept: application/json
+
+### List stored knowledge documents
+GET {{host}}/api/knowledge?limit=12
+Accept: application/json

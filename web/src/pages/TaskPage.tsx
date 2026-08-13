@@ -13,19 +13,15 @@ import ReferenceSolution from "../components/ReferenceSolution";
 import {submissionsApi, Submission} from "../api/submissionApi";
 import {tasksApi} from "../api/taskApi";
 
+const ACTIVE_SUBMISSION_STATUSES = new Set(["QUEUED", "RUNNING"]);
+
 function ReviewFindings({
                             review,
-                            onApply,
-                            applied,
-                            applying,
                         }: {
     review: NonNullable<ReturnType<typeof useMutation>["data"]> & {
         valid: boolean;
         warnings: any[];
     };
-    onApply: (field: string, value: string) => void;
-    applied: Set<string>;
-    applying: boolean;
 }) {
     return (
         <div className={review.valid ? "review-ok" : "review-panel"}>
@@ -71,19 +67,6 @@ function ReviewFindings({
                             <p>{warning.suggestion}</p>
                         </div>
                     )}
-                    {warning.correctedValue && (
-                        <button
-                            className="use-correction"
-                            disabled={applying || applied.has(warning.field)}
-                            onClick={() => onApply(warning.field, warning.correctedValue)}
-                        >
-                            {applied.has(warning.field)
-                                ? "Applied to task"
-                                : applying
-                                    ? "Applying…"
-                                    : "Apply correction"}
-                        </button>
-                    )}
                 </div>
             ))}
         </div>
@@ -107,25 +90,36 @@ export default function TaskPage() {
         "problem",
     );
     const [code, setCode] = useState("// Write your solution here\n\n");
-    const [hint, setHint] = useState<{ hint: string }>();
+    const [hint, setHint] = useState<string>();
+    const [hintError, setHintError] = useState<string>();
     const [submission, setSubmission] = useState<Submission>();
-    const [applied, setApplied] = useState<Set<string>>(new Set());
     const [moderationAction, setModerationAction] = useState<"publish" | "reject">();
 
+    const executionFeedback = submission
+        ? [
+            `Status: ${submission.status}`,
+            `Tests passed: ${submission.passedTests ?? 0}/${submission.totalTests ?? 0}`,
+            submission.error,
+        ].filter(Boolean).join("\n")
+        : "No solution has been run yet. Inspect the current code and give a useful first next step.";
+
     const hintMutation = useMutation({
-        mutationFn: (level: number) => tasksApi.hint(id, level),
-        onSuccess: setHint,
-    });
-    const review = useMutation({mutationFn: () => tasksApi.review(id)});
-    const applyCorrection = useMutation({
-        mutationFn: ({field, value}: { field: string; value: string }) =>
-            tasksApi.applyCorrection(id, field, value),
-        onSuccess: (_, correction) => {
-            setApplied((previous) => new Set(previous).add(correction.field));
-            qc.invalidateQueries({queryKey: ["task", id]});
-            qc.invalidateQueries({queryKey: ["solutions", id]});
+        mutationFn: () => tasksApi.hint(id, code, executionFeedback),
+        onMutate: () => {
+            setHintError(undefined);
+        },
+        onSuccess: (response) => {
+            setHint(response.hint);
+        },
+        onError: (error) => {
+            setHintError(error instanceof Error ? error.message : "Could not load this hint.");
         },
     });
+    const requestHint = () => {
+        setHintError(undefined);
+        hintMutation.mutate();
+    };
+    const review = useMutation({mutationFn: () => tasksApi.review(id)});
     const moderate = useMutation({
         mutationFn: (action: "publish" | "reject") => tasksApi[action](id),
         onSuccess: () => qc.invalidateQueries({queryKey: ["task", id]}),
@@ -147,13 +141,11 @@ export default function TaskPage() {
 
         },
     });
+    const submissionInProgress = submit.isPending || Boolean(
+        submission && ACTIVE_SUBMISSION_STATUSES.has(submission.status),
+    );
     useEffect(() => {
-        if (
-            !submission ||
-            ["PASSED", "FAILED", "COMPILE_ERROR", "TIMEOUT"].includes(
-                submission.status,
-            )
-        )
+        if (!submission || !ACTIVE_SUBMISSION_STATUSES.has(submission.status))
             return;
         const timer = setInterval(
             async () => setSubmission(await submissionsApi.get(submission.id)),
@@ -221,11 +213,6 @@ export default function TaskPage() {
                         {review.data && (
                             <ReviewFindings
                                 review={review.data}
-                                onApply={(field, value) =>
-                                    applyCorrection.mutate({field, value})
-                                }
-                                applied={applied}
-                                applying={applyCorrection.isPending}
                             />
                         )}
                     </>
@@ -282,15 +269,6 @@ export default function TaskPage() {
                                         </b>
                                         <ReferenceSolution
                                             source={solution.sourceCode}
-                                            editable={
-                                                task.status === "DRAFT" && solution.type === "REFERENCE"
-                                            }
-                                            onAutoSave={(sourceCode) =>
-                                                applyCorrection.mutateAsync({
-                                                    field: "referenceSolutions",
-                                                    value: sourceCode,
-                                                })
-                                            }
                                         />
                                     </div>
                                 ))
@@ -324,11 +302,19 @@ export default function TaskPage() {
                             </button>
                             <button
                                 className="primary"
-                                disabled={submit.isPending}
+                                disabled={submissionInProgress}
                                 onClick={() => submit.mutate()}
                             >
-                                <Play size={15} fill="currentColor"/>{" "}
-                                {submit.isPending ? "Running…" : "Run solution"}
+                                {submissionInProgress ? (
+                                    <LoaderCircle size={15} className="spin"/>
+                                ) : (
+                                    <Play size={15} fill="currentColor"/>
+                                )}{" "}
+                                {submit.isPending || submission?.status === "QUEUED"
+                                    ? "Queued…"
+                                    : submissionInProgress
+                                        ? "Running…"
+                                        : "Run solution"}
                             </button>
                         </div>
                     </div>
@@ -340,18 +326,28 @@ export default function TaskPage() {
                                 <span>Ask your AI coach for a hint</span>
                             </div>
                         </div>
-                        <div className="hint-levels">
-                            {[1, 2, 3].map((level) => (
-                                <button
-                                    key={level}
-                                    onClick={() => hintMutation.mutate(level)}
-                                    disabled={hintMutation.isPending}
-                                >
-                                    Hint {level}
-                                </button>
-                            ))}
-                        </div>
-                        {hint && <p className="hint">{hint.hint}</p>}
+                        <button
+                            className="primary hint-action"
+                            onClick={requestHint}
+                            disabled={hintMutation.isPending || submissionInProgress}
+                        >
+                            {hintMutation.isPending && <LoaderCircle size={15} className="spin"/>}
+                            {hintMutation.isPending
+                                ? "Thinking…"
+                                : hint
+                                    ? "Ask for another step"
+                                    : "Show me the next step"}
+                        </button>
+                        {hintMutation.isPending && (
+                            <p className="hint-status">Analyzing your code…</p>
+                        )}
+                        {hintError && <p className="hint-error">{hintError}</p>}
+                        {hint && (
+                            <div className="hint-result">
+                                <span>Next step</span>
+                                <p>{hint}</p>
+                            </div>
+                        )}
                     </div>
                     {submission && (
                         <div className={"result panel " + submission.status.toLowerCase()}>

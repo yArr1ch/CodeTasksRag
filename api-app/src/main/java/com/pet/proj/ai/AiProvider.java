@@ -1,5 +1,5 @@
 package com.pet.proj.ai;
 
-public interface AiProvider {
-    <T> T generate(String prompt, Class<T> responseType);
+public sealed interface AiProvider permits OllamaProvider {
+    <T> T generate(String prompt, Class<T> responseType, double temperature);
 }

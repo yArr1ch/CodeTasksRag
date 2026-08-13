@@ -42,9 +42,7 @@ spring:
       chat:
         keep-alive: 30m
         options:
-          #model: qwen3:8b
           model: qwen2.5-coder:7b
-          temperature: 0.0
           top-p: 0.8
           top-k: 20
           num-ctx: ${OLLAMA_NUM_CTX:16384}
@@ -62,13 +60,27 @@ spring:
 server:
   port: 8080
 app:
+  ai:
+    max-concurrent-requests: 3
+    deterministic-temperature: 0.0
+    repair-temperature: 0.25
   task-similarity:
     threshold: 0.7
+    max-results: 5
   solution-similarity:
     threshold: 0.0
+    max-results: 5
+  task-generation:
+    max-attempts: 3
+    knowledge-results: 2
+    timeout: 10m
+  task-hint:
+    knowledge-results: 3
   knowledge:
     similarity-threshold: 0.4
+    chunk-size: 500
+    chunk-overlap: 75
   kafka:
     topics:
-      submission-created: ${KAFKA_SUBMISSION_CREATED_TOPIC:submission-created}
-      submission-completed: ${KAFKA_SUBMISSION_COMPLETED_TOPIC:submission-completed}
+      submission-created: submission-created
+      submission-completed: submission-completed

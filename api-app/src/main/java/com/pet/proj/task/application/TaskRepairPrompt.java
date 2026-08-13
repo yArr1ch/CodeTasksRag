@@ -1,8 +1,7 @@
 package com.pet.proj.task.application;
 
-record TaskRepairPrompt(String basePrompt, ReferenceSolutionException failure, int attempt) {
-    String render() {
-        return PromptResource.load("prompts/task/repair-v1.txt")
-                .formatted(basePrompt, attempt, failure.getMessage(), failure.sourceCode());
-    }
+import java.util.List;
+
+record TaskRepairPrompt(String title, String description, List<String> constraints, ReferenceSolutionException failure,
+                        int attempt) implements TaskPrompt {
 }

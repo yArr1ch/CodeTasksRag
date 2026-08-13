@@ -32,3 +32,5 @@ coverage/
 # Operating-system files
 .DS_Store
 Thumbs.db
+
+allure-results/*

@@ -4,6 +4,8 @@ import com.pet.proj.task.application.TaskGenerationService;
 import com.pet.proj.task.application.TaskService;
 import com.pet.proj.task.application.TaskSolutionService;
 import com.pet.proj.task.domain.Task;
+import com.pet.proj.user.application.UserAccountService;
+import com.pet.proj.user.api.ReferenceUnlockResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -34,6 +37,7 @@ public class TaskController {
     private final TaskService taskService;
     private final TaskSolutionService taskSolutionService;
     private final TaskGenerationService taskGenerationService;
+    private final UserAccountService userAccounts;
 
     @GetMapping
     public TaskPageResponse getAll(
@@ -48,16 +52,19 @@ public class TaskController {
     }
 
     @PostMapping("/generate")
+    @PreAuthorize("hasRole('ADMIN')")
     public TaskGenerationResponse generate(@Valid @RequestBody TaskGenerationRequest request) {
         return taskGenerationService.generate(request);
     }
 
     @GetMapping("/generations/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public TaskGenerationResponse getGeneration(@PathVariable UUID id) {
         return taskGenerationService.getGeneration(id);
     }
 
     @PostMapping("/generations/{id}/cancel")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelGeneration(@PathVariable UUID id) {
         taskGenerationService.cancelGeneration(id);
@@ -65,6 +72,7 @@ public class TaskController {
 
     // internal
     @PostMapping("/embeddings/reindex")
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Integer> reindexEmbeddings() {
         return Map.of(
                 "tasksIndexed", taskService.reindexTaskEmbeddings(),
@@ -72,13 +80,14 @@ public class TaskController {
     }
 
     @PostMapping("/{id}/review")
+    @PreAuthorize("hasRole('ADMIN')")
     public CompletableFuture<TaskReview> review(@PathVariable UUID id) {
         return taskService.review(id);
     }
 
     @PostMapping("/{id}/hints")
     public CompletableFuture<TaskHintResponse> hint(@PathVariable UUID id, @Valid @RequestBody TaskHintRequest request) {
-        return taskService.generateHint(id, request);
+        return taskService.generateHint(id, request, userAccounts.currentId());
     }
 
     @GetMapping("/{id}/solutions")
@@ -86,13 +95,20 @@ public class TaskController {
         return taskSolutionService.findSolutions(id, query);
     }
 
+    @PostMapping("/{id}/solutions/unlock")
+    public ReferenceUnlockResponse unlockSolutions(@PathVariable UUID id) {
+        return taskSolutionService.unlockReference(id);
+    }
+
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.OK)
     public void publish(@PathVariable UUID id) {
         taskService.publish(id);
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.OK)
     public void reject(@PathVariable UUID id) {
         taskService.reject(id);

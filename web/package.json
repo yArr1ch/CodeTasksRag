@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.81.5",
     "axios": "^1.7.9",
+    "keycloak-js": "^26.2.0",
     "lucide-react": "^0.468.0",
     "prettier": "^3.9.6",
     "prettier-plugin-java": "^2.10.3",

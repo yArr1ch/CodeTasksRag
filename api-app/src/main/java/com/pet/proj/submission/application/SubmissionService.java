@@ -6,8 +6,9 @@ import com.pet.proj.submission.domain.Submission;
 import com.pet.proj.submission.domain.SubmissionStatus;
 import com.pet.proj.submission.persistence.SubmissionEntity;
 import com.pet.proj.submission.persistence.SubmissionRepository;
-import lombok.RequiredArgsConstructor;
+import com.pet.proj.user.application.UserAccountService;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -22,22 +23,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class SubmissionService {
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(30);
 
     private final SubmissionRepository submissions;
     private final SubmissionMapper submissionMapper;
     private final KafkaTemplate<String, SubmissionCreatedEvent> submissionEvents;
+    private final UserAccountService userAccounts;
 
     @Value("${app.kafka.topics.submission-created}")
     private String submissionCreatedTopic;
-    private final ConcurrentHashMap<UUID, CompletableFuture<ReferenceExecutionResult>> referenceExecutions = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<UUID, CompletableFuture<ReferenceExecutionResult>> referenceExecutions = new ConcurrentHashMap<>();
 
     public Submission submit(UUID taskId, String sourceCode) {
+        var userId = userAccounts.currentId();
         var saved = submissions.save(SubmissionEntity.builder()
                 .taskId(taskId)
+                .userId(userId)
                 .sourceCode(sourceCode)
                 .executionMode(SubmissionCreatedEvent.STANDARD)
                 .status(SubmissionStatus.QUEUED)

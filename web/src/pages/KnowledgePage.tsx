@@ -3,6 +3,7 @@ import {BookOpen, Check, FileUp, Save, UploadCloud} from 'lucide-react';
 import {useInfiniteQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import Layout from '../components/Layout';
 import {knowledgeApi} from '../api/knowledgeApi';
+import {useAuth} from '../auth/AuthContext';
 
 function errorMessage(error: unknown, fallback: string) {
     const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -10,6 +11,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 export default function KnowledgePage() {
+    const auth = useAuth();
     const queryClient = useQueryClient();
     const listScrollRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -19,6 +21,7 @@ export default function KnowledgePage() {
     const {data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error: listError} = useInfiniteQuery({
         queryKey: ['knowledge-documents'],
         queryFn: ({pageParam}) => knowledgeApi.list(pageParam),
+        enabled: auth.admin,
         initialPageParam: null as string | null,
         getNextPageParam: lastPage => lastPage.hasMore ? lastPage.nextCursor : undefined
     });
@@ -66,6 +69,9 @@ export default function KnowledgePage() {
         setSelectedFile(file.name.endsWith('.md') ? file : undefined);
     }
 
+    if (!auth.admin) return <Layout>
+        <div className="error">Only administrators can access the knowledge library.</div>
+    </Layout>;
     return <Layout>
         <section className="knowledge-page">
             <div className="knowledge-heading">

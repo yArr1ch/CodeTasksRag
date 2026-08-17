@@ -15,6 +15,7 @@ import com.pet.proj.task.domain.Task;
 import com.pet.proj.task.domain.TaskStatus;
 import com.pet.proj.task.persistence.TaskEntity;
 import com.pet.proj.task.persistence.TaskRepository;
+import com.pet.proj.points.application.PointService;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +32,8 @@ import java.util.concurrent.*;
 import java.util.function.Supplier;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
+@RequiredArgsConstructor
 public class TaskService {
     private final TaskRepository taskRepository;
     private final ObjectMapper objectMapper;
@@ -44,9 +45,7 @@ public class TaskService {
     private final SubmissionService submissionService;
     private final ExecutorService aiExecutor;
     private final Semaphore limit;
-
-    @Value("${app.ai.max-concurrent-requests:3}")
-    private int maxConcurrentRequests;
+    private final PointService pointService;
 
     @Value("${app.ai.deterministic-temperature:0.0}")
     private double aiTemperature;
@@ -110,6 +109,14 @@ public class TaskService {
     }
 
     public CompletableFuture<TaskHintResponse> generateHint(UUID id, TaskHintRequest request) {
+        return generateHint(id, request, null);
+    }
+
+    public CompletableFuture<TaskHintResponse> generateHint(UUID id, TaskHintRequest request, UUID userId) {
+        if (pointService != null) {
+            getTaskEntity(id);
+            pointService.chargeHint(userId, id);
+        }
         return CompletableFuture.supplyAsync(() -> {
                     var task = getTaskEntity(id);
                     var query = String.join("\n",

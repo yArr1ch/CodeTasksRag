@@ -20,6 +20,28 @@ button, a {
     font: inherit
 }
 
+.logout-button { margin-left: 8px; font-size: 11px; }
+.account-page { max-width: 980px; margin: 0 auto; padding: 48px 24px; }
+.account-page h1 { margin: 8px 0 28px; }
+.account-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+.account-stat { padding: 22px; display: flex; flex-direction: column; gap: 8px; }
+.account-stat span, .point-row span, .leaderboard-row span { color: #87938a; font-size: 12px; }
+.account-stat b { font-size: 26px; color: #a0dfaa; }
+.point-history { padding: 0 18px 12px; }
+.point-row, .leaderboard-row { display: flex; align-items: center; gap: 18px; padding: 14px 0; border-bottom: 1px solid #25302a; }
+.point-row b { margin-left: auto; }
+.points-positive { color: #9bd7a7; }
+.points-negative { color: #e7a3a0; }
+.leaderboard { padding: 0 22px; }
+.leaderboard-row b { flex: 1; }
+.leaderboard-rank { min-width: 38px; color: #d8b86e !important; }
+.solution-unlock { padding: 12px 0 22px; }
+
+@media (max-width: 700px) {
+    .account-summary { grid-template-columns: 1fr; }
+    .logout-button { display: none; }
+}
+
 button {
     cursor: pointer
 }

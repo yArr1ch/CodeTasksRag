@@ -3,8 +3,10 @@ import {ArrowLeft, LoaderCircle, Sparkles} from 'lucide-react';
 import {Link, useNavigate} from 'react-router-dom';
 import Layout from '../components/Layout';
 import {useTaskGeneration} from '../state/TaskGenerationContext';
+import {useAuth} from '../auth/AuthContext';
 
 export default function CreateTask() {
+    const auth = useAuth();
     const navigate = useNavigate();
     const {
         prompt,
@@ -35,6 +37,9 @@ export default function CreateTask() {
     ];
     const activeStage = Math.max(0, stages.findIndex(stage => stage.status === generation?.status));
 
+    if (!auth.admin) return <Layout>
+        <div className="error">Only administrators can create and review tasks.</div>
+    </Layout>;
     return <Layout>
         <section className="create-page">
             <Link className="back" to="/"> <ArrowLeft size={15}/> All challenges</Link>
@@ -65,14 +70,17 @@ export default function CreateTask() {
                         </button>
                     </div>
                     {isPending && <div className="generation-progress">
-                        <div className="generation-status"><LoaderCircle size={14} className="spin"/> Task generation in progress</div>
+                        <div className="generation-status"><LoaderCircle size={14} className="spin"/> Task generation in
+                            progress
+                        </div>
                         <div className="generation-steps" aria-label="Task generation progress">
                             {stages.map((stage, index) => <span
                                 className={index < activeStage ? 'complete' : index === activeStage ? 'active' : ''}
                                 key={stage.status}
                             >{stage.label}</span>)}
                         </div>
-                        {generation?.attempt ? <small>Repair attempt {generation.attempt} of {generation.maxAttempts}</small> : null}
+                        {generation?.attempt ?
+                            <small>Repair attempt {generation.attempt} of {generation.maxAttempts}</small> : null}
                         <button
                             className="secondary generation-cancel"
                             disabled={isCancelling}
@@ -109,7 +117,8 @@ export default function CreateTask() {
                                 <span>{Math.round(similar.similarity * 100)}% match</span>
                                 <span>Existing challenge</span>
                             </div>
-                            <div className="match-bar"><i style={{width: `${Math.round(similar.similarity * 100)}%`}}/></div>
+                            <div className="match-bar"><i style={{width: `${Math.round(similar.similarity * 100)}%`}}/>
+                            </div>
                             <b>{similar.title}</b>
                             <p>{similar.description}</p>
                             <button className="existing-button" onClick={() => navigate(`/tasks/${similar.id}`)}>

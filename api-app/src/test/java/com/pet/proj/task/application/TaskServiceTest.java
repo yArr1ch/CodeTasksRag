@@ -3,6 +3,7 @@ package com.pet.proj.task.application;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pet.proj.ai.OllamaProvider;
 import com.pet.proj.coaching.application.KnowledgeDocumentService;
+import com.pet.proj.points.application.PointService;
 import com.pet.proj.submission.application.SubmissionService;
 import com.pet.proj.task.domain.Task;
 import com.pet.proj.task.domain.TaskStatus;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,6 +44,10 @@ class TaskServiceTest {
     private SubmissionService submissions;
     @Mock
     private ExecutorService aiExecutor;
+    @Mock
+    private Semaphore limit;
+    @Mock
+    private PointService pointService;
 
     @InjectMocks
     private TaskService taskService;

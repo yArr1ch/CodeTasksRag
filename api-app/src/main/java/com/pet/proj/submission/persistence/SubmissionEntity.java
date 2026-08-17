@@ -20,6 +20,9 @@ public class SubmissionEntity {
     @Column(nullable = false)
     private UUID taskId;
 
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(nullable = false)
     private String executionMode;
 

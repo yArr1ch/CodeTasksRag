@@ -1,8 +1,17 @@
 import axios from 'axios';
+import {keycloak} from '../auth/keycloak';
 
 export const http = axios.create({
     baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api',
     headers: {'Content-Type': 'application/json'}
+});
+
+http.interceptors.request.use(async config => {
+    if (keycloak.authenticated) {
+        await keycloak.updateToken(30);
+        config.headers.Authorization = `Bearer ${keycloak.token}`;
+    }
+    return config;
 });
 
 export async function get<T>(path: string) {

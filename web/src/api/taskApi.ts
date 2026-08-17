@@ -55,6 +55,7 @@ export const tasksApi = {
     hint: (id: string, code: string, executionFeedback: string) =>
         post<{ hint: string }>(`/tasks/${id}/hints`, {code, executionFeedback}),
     solutions: (id: string, query?: string) => get<TaskSolution[]>(`/tasks/${id}/solutions${query ? `?query=${encodeURIComponent(query)}` : ''}`),
+    unlockSolutions: (id: string) => post<{ unlocked: boolean; points: number }>(`/tasks/${id}/solutions/unlock`),
     publish: (id: string) => post<void>(`/tasks/${id}/publish`),
     reject: (id: string) => post<void>(`/tasks/${id}/reject`)
 };

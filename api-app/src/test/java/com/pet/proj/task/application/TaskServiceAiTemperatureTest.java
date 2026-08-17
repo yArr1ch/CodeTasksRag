@@ -3,6 +3,7 @@ package com.pet.proj.task.application;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pet.proj.ai.OllamaProvider;
 import com.pet.proj.coaching.application.KnowledgeDocumentService;
+import com.pet.proj.points.application.PointService;
 import com.pet.proj.submission.application.SubmissionService;
 import com.pet.proj.task.api.TaskReview;
 import com.pet.proj.task.domain.TaskStatus;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,6 +42,8 @@ class TaskServiceAiTemperatureTest {
     private KnowledgeDocumentService knowledgeDocuments;
     @Mock
     private SubmissionService submissions;
+    @Mock
+    private PointService pointService;
 
     @Test
     void review_usesDeterministicTemperature() throws Exception {
@@ -62,7 +66,9 @@ class TaskServiceAiTemperatureTest {
                     solutions,
                     knowledgeDocuments,
                     submissions,
-                    executor);
+                    executor,
+                    new Semaphore(3),
+                    pointService);
 
             var result = service.review(taskId).get();
 

@@ -9,10 +9,14 @@ import com.pet.proj.submission.domain.SubmissionStatus;
 import com.pet.proj.submission.persistence.SubmissionRepository;
 import com.pet.proj.task.persistence.TaskEntity;
 import com.pet.proj.task.persistence.TaskRepository;
+import com.pet.proj.points.application.PointService;
+import com.pet.proj.user.api.ReferenceUnlockResponse;
+import com.pet.proj.user.application.UserAccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -29,6 +33,8 @@ public class TaskSolutionService {
     private final TaskRepository taskRepository;
     private final SubmissionRepository submissionRepository;
     private final SemanticSearchService semanticSearchService;
+    private final PointService pointService;
+    private final UserAccountService userAccounts;
 
     @Value("${app.solution-similarity.threshold:0.0}")
     private double similarityThreshold;
@@ -40,18 +46,23 @@ public class TaskSolutionService {
         var task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new NoSuchElementException("task not found"));
         if (task.getStatus() == TaskStatus.DRAFT) {
+            if (!userAccounts.isAdmin()) {
+                throw new AccessDeniedException("draft solutions are available to admins only");
+            }
             return referenceSolutions(task);
         }
         if (task.getStatus() != TaskStatus.PUBLISHED) {
             return List.of();
         }
+        var referenceVisible = pointService == null || pointService.canViewReference(taskId);
+        var communityVisible = pointService == null || pointService.canViewCommunity(taskId);
         var searchText = query == null || query.isBlank()
                 ? taskSearchText(task)
                 : query;
 
         var scores = semanticSearchService.search(
                 searchText,
-                maxResults,
+                maxResults * 2,
                 similarityThreshold,
                 "documentType == 'solution' && taskId == '" + taskId + "' && status == 'PASSED'");
 
@@ -63,9 +74,23 @@ public class TaskSolutionService {
                         document.getText().substring(document.getText().indexOf("\n\n") + 2),
                         TaskSolution.SolutionType.valueOf(document.getMetadata().get("solutionType").toString()),
                         semanticSearchService.score(document)))
+                .filter(solution -> solution.type() == TaskSolution.SolutionType.REFERENCE
+                        ? referenceVisible : communityVisible)
                 .filter(solution -> solutionIds.add(solution.id()))
                 .limit(maxResults)
                 .toList();
+    }
+
+    public ReferenceUnlockResponse unlockReference(UUID taskId) {
+        var task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new NoSuchElementException("task not found"));
+        if (task.getStatus() == TaskStatus.DRAFT && userAccounts.isAdmin()) {
+            return new ReferenceUnlockResponse(true, pointService.currentBalance());
+        }
+        if (task.getStatus() != TaskStatus.PUBLISHED || pointService == null) {
+            throw new AccessDeniedException("reference solutions are not available");
+        }
+        return pointService.unlockReference(taskId);
     }
 
     public void indexPublishedTask(TaskEntity task) {
@@ -94,6 +119,11 @@ public class TaskSolutionService {
         if (!SubmissionCreatedEvent.STANDARD.equals(event.executionMode())
                 || !SubmissionStatus.PASSED.name().equals(event.status())) {
             return;
+        }
+        if (pointService != null) {
+            submissionRepository.findById(event.submissionId())
+                    .ifPresent(submission -> pointService.recordPassedSubmission(
+                            submission.getUserId(), event.taskId(), event.submissionId()));
         }
         taskRepository.findById(event.taskId())
                 .filter(task -> task.getStatus() == TaskStatus.PUBLISHED)

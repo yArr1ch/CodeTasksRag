@@ -5,6 +5,7 @@ import com.pet.proj.submission.domain.Submission;
 import com.pet.proj.submission.domain.SubmissionStatus;
 import com.pet.proj.submission.persistence.SubmissionEntity;
 import com.pet.proj.submission.persistence.SubmissionRepository;
+import com.pet.proj.user.application.UserAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,11 +33,14 @@ class SubmissionServiceTest {
     @Mock
     private KafkaTemplate<String, SubmissionCreatedEvent> events;
 
+    @Mock
+    private UserAccountService userAccounts;
+
     private SubmissionService service;
 
     @BeforeEach
     void setUp() {
-        service = new SubmissionService(submissions, mapper, events);
+        service = new SubmissionService(submissions, mapper, events, userAccounts);
         ReflectionTestUtils.setField(service, "submissionCreatedTopic", "submission-created");
     }
 

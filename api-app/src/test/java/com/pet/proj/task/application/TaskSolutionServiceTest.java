@@ -4,17 +4,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pet.proj.ai.SemanticSearchService;
 import com.pet.proj.contracts.SubmissionCompletedEvent;
 import com.pet.proj.contracts.SubmissionCreatedEvent;
+import com.pet.proj.points.application.PointService;
 import com.pet.proj.submission.domain.SubmissionStatus;
 import com.pet.proj.submission.persistence.SubmissionRepository;
 import com.pet.proj.task.domain.TaskStatus;
 import com.pet.proj.task.persistence.TaskEntity;
 import com.pet.proj.task.persistence.TaskRepository;
+import com.pet.proj.user.application.UserAccountService;
+import org.springframework.ai.document.Document;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class TaskSolutionServiceTest {
@@ -33,10 +39,21 @@ class TaskSolutionServiceTest {
     private SubmissionRepository submissions;
     @Mock
     private SemanticSearchService semanticSearch;
+    @Mock
+    private PointService pointService;
+    @Mock
+    private UserAccountService userAccounts;
+
+    @BeforeEach
+    void setUp() {
+        when(userAccounts.isAdmin()).thenReturn(true);
+        when(pointService.canViewReference(any())).thenReturn(true);
+        when(pointService.canViewCommunity(any())).thenReturn(true);
+    }
 
     @Test
     void draftSolutionsAreReadFromDatabaseWithoutVectorWrites() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
         var task = task(TaskStatus.DRAFT);
         when(tasks.findById(task.getId())).thenReturn(Optional.of(task));
 
@@ -49,7 +66,7 @@ class TaskSolutionServiceTest {
 
     @Test
     void passedStandardSubmissionReindexesPublishedTask() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
         var task = task(TaskStatus.PUBLISHED);
         when(tasks.findById(task.getId())).thenReturn(Optional.of(task));
         when(submissions.findByTaskIdAndStatusAndExecutionMode(
@@ -65,7 +82,7 @@ class TaskSolutionServiceTest {
 
     @Test
     void publishedSolutionReadDoesNotReplaceVectorDocuments() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
         var task = task(TaskStatus.PUBLISHED);
         when(tasks.findById(task.getId())).thenReturn(Optional.of(task));
         when(semanticSearch.search(
@@ -84,7 +101,7 @@ class TaskSolutionServiceTest {
 
     @Test
     void publishedSolutionRead_duplicateVectorDocuments_returnsOneSolution() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
         var task = task(TaskStatus.PUBLISHED);
         var solutionId = UUID.randomUUID();
         var metadata = Map.of(
@@ -108,7 +125,7 @@ class TaskSolutionServiceTest {
 
     @Test
     void referenceOracleEventDoesNotUpdateCommunitySolutions() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
 
         service.handleSubmissionCompleted(new SubmissionCompletedEvent(
                 UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SubmissionStatus.PASSED.name(),
@@ -119,7 +136,7 @@ class TaskSolutionServiceTest {
 
     @Test
     void reindexRemovesStaleSolutionDocuments() {
-        var service = new TaskSolutionService(tasks, submissions, semanticSearch);
+        var service = new TaskSolutionService(tasks, submissions, semanticSearch, pointService, userAccounts);
         when(tasks.findAll()).thenReturn(List.of(task(TaskStatus.PUBLISHED), task(TaskStatus.REJECTED)));
         when(submissions.findByTaskIdAndStatusAndExecutionMode(
                 org.mockito.ArgumentMatchers.any(), eq(SubmissionStatus.PASSED),

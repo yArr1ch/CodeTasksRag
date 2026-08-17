@@ -12,6 +12,7 @@ import Layout from "../components/Layout";
 import ReferenceSolution from "../components/ReferenceSolution";
 import {submissionsApi, Submission} from "../api/submissionApi";
 import {tasksApi} from "../api/taskApi";
+import {useAuth} from "../auth/AuthContext";
 
 const ACTIVE_SUBMISSION_STATUSES = new Set(["QUEUED", "RUNNING"]);
 
@@ -77,23 +78,33 @@ export default function TaskPage() {
     const {id = ""} = useParams();
     const nav = useNavigate();
     const qc = useQueryClient();
+    const auth = useAuth();
     const {
         data: task,
         isLoading,
         error,
     } = useQuery({queryKey: ["task", id], queryFn: () => tasksApi.get(id)});
-    const {data: solutions} = useQuery({
-        queryKey: ["solutions", id],
-        queryFn: () => tasksApi.solutions(id),
-    });
     const [activeTab, setActiveTab] = useState<"problem" | "solutions">(
         "problem",
     );
+    const {data: solutions, isLoading: solutionsLoading} = useQuery({
+        queryKey: ["solutions", id],
+        queryFn: () => tasksApi.solutions(id),
+        enabled: activeTab === "solutions",
+    });
     const [code, setCode] = useState("// Write your solution here\n\n");
     const [hint, setHint] = useState<string>();
     const [hintError, setHintError] = useState<string>();
     const [submission, setSubmission] = useState<Submission>();
     const [moderationAction, setModerationAction] = useState<"publish" | "reject">();
+    const unlockSolutions = useMutation({
+        mutationFn: () => tasksApi.unlockSolutions(id),
+        onSuccess: () => {
+            qc.invalidateQueries({queryKey: ["solutions", id]});
+            qc.invalidateQueries({queryKey: ["me"]});
+            qc.invalidateQueries({queryKey: ["points"]});
+        }
+    });
 
     const executionFeedback = submission
         ? [
@@ -110,6 +121,8 @@ export default function TaskPage() {
         },
         onSuccess: (response) => {
             setHint(response.hint);
+            qc.invalidateQueries({queryKey: ["me"]});
+            qc.invalidateQueries({queryKey: ["points"]});
         },
         onError: (error) => {
             setHintError(error instanceof Error ? error.message : "Could not load this hint.");
@@ -148,7 +161,14 @@ export default function TaskPage() {
         if (!submission || !ACTIVE_SUBMISSION_STATUSES.has(submission.status))
             return;
         const timer = setInterval(
-            async () => setSubmission(await submissionsApi.get(submission.id)),
+            async () => {
+                const next = await submissionsApi.get(submission.id);
+                setSubmission(next);
+                if (next.status === "PASSED") {
+                    qc.invalidateQueries({queryKey: ["me"]});
+                    qc.invalidateQueries({queryKey: ["points"]});
+                }
+            },
             1500,
         );
         return () => clearInterval(timer);
@@ -173,6 +193,8 @@ export default function TaskPage() {
                 <div className="error">Task not found.</div>
             </Layout>
         );
+    const referenceUnlocked = solutions?.some(solution => solution.type === "REFERENCE") ?? false;
+    const showUnlock = task.status === "PUBLISHED" && !auth.admin && !referenceUnlocked;
     return (
         <Layout>
             <div className="task-header">
@@ -181,7 +203,7 @@ export default function TaskPage() {
                 </button>
                 <span className="difficulty d1">● {task.status}</span>
                 <h1>{task.title}</h1>
-                {task.status === "DRAFT" && (
+                {task.status === "DRAFT" && auth.admin && (
                     <>
                         <div className="task-actions">
                             <button
@@ -260,23 +282,42 @@ export default function TaskPage() {
                         </>
                     ) : (
                         <div className="solutions-list">
-                            {solutions?.length ? (
-                                solutions.map((solution) => (
-                                    <div className="example" key={solution.id}>
-                                        <b>
-                                            {solution.type} · {(solution.similarity * 100).toFixed(0)}
-                                            % match
-                                        </b>
-                                        <ReferenceSolution
-                                            source={solution.sourceCode}
-                                        />
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="empty-state">
-                                    No reference solutions available yet.
-                                </p>
-                            )}
+                            {solutionsLoading ?
+                                <p className="empty-state">Loading solutions…</p> : solutions?.length ? <>
+                                        {showUnlock && <div className="solution-unlock">
+                                            <p className="empty-state">Official solutions cost 50 points to unlock.
+                                                Community solutions appear after you pass.</p>
+                                            <button className="primary" onClick={() => unlockSolutions.mutate()}
+                                                    disabled={unlockSolutions.isPending}>
+                                                {unlockSolutions.isPending ? "Unlocking…" : "Unlock reference solution · 50 points"}
+                                            </button>
+                                        </div>}
+                                        {solutions.map((solution) => (
+                                            <div className="example" key={solution.id}>
+                                                <b>
+                                                    {solution.type} · {(solution.similarity * 100).toFixed(0)}
+                                                    % match
+                                                </b>
+                                                <ReferenceSolution
+                                                    source={solution.sourceCode}
+                                                />
+                                            </div>
+                                        ))}</>
+                                    : <>
+                                        {task.status === "PUBLISHED" && !auth.admin && <>
+                                            <p className="empty-state">Official solutions cost 50 points to unlock.
+                                                Community solutions appear after you pass.</p>
+                                            <button className="primary" onClick={() => unlockSolutions.mutate()}
+                                                    disabled={unlockSolutions.isPending}>
+                                                {unlockSolutions.isPending ? "Unlocking…" : "Unlock reference solution · 50 points"}
+                                            </button>
+                                            {unlockSolutions.error &&
+                                                <p className="hint-error">You need 50 points to unlock the reference
+                                                    solution.</p>}
+                                        </>}
+                                        {task.status !== "PUBLISHED" || auth.admin ?
+                                            <p className="empty-state">No reference solutions available yet.</p> : null}
+                                    </>}
                         </div>
                     )}
                 </div>

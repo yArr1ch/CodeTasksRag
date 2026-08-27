@@ -1,0 +1,13 @@
+app:
+  aws:
+    region: ${AWS_REGION:us-east-1}
+    endpoint: ${AWS_ENDPOINT_OVERRIDE:http://localhost:4566}
+    access-key-id: ${AWS_ACCESS_KEY_ID:test}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
+    sns:
+      task-generation-topic-arn: ${AWS_SNS_TASK_GENERATION_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:task-generation-requested}
+    sqs:
+      task-generation-queue-url: ${AWS_SQS_TASK_GENERATION_QUEUE_URL:http://localhost:4566/000000000000/task-generation-requests}
+      task-generation-dead-letter-queue-url: ${AWS_SQS_TASK_GENERATION_DLQ_URL:http://localhost:4566/000000000000/task-generation-requests-dlq}
+      wait-time-seconds: ${AWS_SQS_WAIT_TIME_SECONDS:20}
+      poll-delay: ${AWS_SQS_POLL_DELAY:1s}

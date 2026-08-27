@@ -6,11 +6,15 @@ plugins {
 
 dependencies {
     implementation(platform(libs.spring.ai.bom))
+    implementation(platform(libs.aws.bom))
 
     implementation(project(":shared-contracts"))
 
     implementation(libs.spring.boot.web)
     implementation(libs.spring.boot.kafka)
+    implementation(libs.aws.sns)
+    implementation(libs.aws.sqs)
+    implementation(libs.aws.netty.nio)
     implementation(libs.spring.boot.security)
     implementation(libs.spring.boot.oauth2.resource.server)
     implementation(libs.spring.boot.validation)

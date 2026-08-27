@@ -12,7 +12,7 @@ spring:
       connect-timeout: 10s
       read-timeout: 10m
   profiles:
-    active: ollama
+    active: ${SPRING_PROFILES_ACTIVE:ollama,messaging-kafka}
   security:
     oauth2:
       resourceserver:
@@ -33,9 +33,11 @@ spring:
     consumer:
       group-id: algocoach-api
       auto-offset-reset: earliest
+      max-poll-records: 1
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: com.pet.proj.contracts
+        max.poll.interval.ms: ${KAFKA_MAX_POLL_INTERVAL_MS:900000}
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
   ai:
@@ -89,6 +91,8 @@ app:
     topics:
       submission-created: submission-created
       submission-completed: submission-completed
+      task-generation-requested: task-generation-requested
+    task-generation-attempts: ${KAFKA_TASK_GENERATION_ATTEMPTS:3}
   points:
     pass-reward: 100
     hint-cost: 10

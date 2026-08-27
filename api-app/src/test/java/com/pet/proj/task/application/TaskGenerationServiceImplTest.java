@@ -3,6 +3,7 @@ package com.pet.proj.task.application;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pet.proj.ai.OllamaProvider;
 import com.pet.proj.coaching.application.KnowledgeDocumentService;
+import com.pet.proj.contracts.TaskGenerationRequestedEvent;
 import com.pet.proj.submission.application.SubmissionService;
 import com.pet.proj.task.api.TaskGenerationRequest;
 import com.pet.proj.task.api.TaskGenerationResponse;
@@ -11,29 +12,30 @@ import com.pet.proj.task.domain.TaskGenerationStatus;
 import com.pet.proj.task.persistence.TaskGenerationEntity;
 import com.pet.proj.task.persistence.TaskGenerationRepository;
 import com.pet.proj.task.persistence.TaskRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TaskGenerationServiceTest {
+class TaskGenerationServiceImplTest {
     @Mock
     private TaskRepository taskRepository;
     @Mock
@@ -51,13 +53,19 @@ class TaskGenerationServiceTest {
     @Mock
     private SubmissionService submissions;
     @Mock
-    private ExecutorService aiExecutor;
+    private KafkaTemplate<String, TaskGenerationRequestedEvent> taskGenerationEvents;
 
     @InjectMocks
-    private TaskGenerationService generationService;
+    private TaskGenerationServiceImpl generationService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(generationService, "generationTimeout", Duration.ofMinutes(10));
+        ReflectionTestUtils.setField(generationService, "taskGenerationRequestedTopic", "task-generation-requested");
+    }
 
     @Test
-    void generate_executorRejected_marksGenerationFailed() {
+    void generate_kafkaPublishFailure_marksGenerationFailed() {
         var generation = new AtomicReference<TaskGenerationEntity>();
         when(taskGenerationRepository.save(any(TaskGenerationEntity.class))).thenAnswer(invocation -> {
             var saved = invocation.<TaskGenerationEntity>getArgument(0);
@@ -66,12 +74,13 @@ class TaskGenerationServiceTest {
         });
         when(taskGenerationRepository.findById(any())).thenAnswer(invocation -> Optional.of(generation.get()));
         when(taskMapper.toGenerationResponse(any())).thenAnswer(invocation -> response(generation.get()));
-        doThrow(new RejectedExecutionException()).when(aiExecutor).execute(any(Runnable.class));
+        when(taskGenerationEvents.send(any(), any(), any()))
+                .thenReturn(CompletableFuture.failedFuture(new IllegalStateException("broker unavailable")));
 
         generationService.generate(new TaskGenerationRequest("prompt"));
 
         assertThat(generation.get().getStatus()).isEqualTo(TaskGenerationStatus.FAILED);
-        assertThat(generation.get().getErrorMessage()).isEqualTo("task generation could not be scheduled");
+        assertThat(generation.get().getErrorMessage()).isEqualTo("task generation could not be queued");
     }
 
     @Test
@@ -88,12 +97,14 @@ class TaskGenerationServiceTest {
         when(taskGenerationRepository.findById(any())).thenAnswer(invocation -> Optional.of(generation.get()));
         when(taskMapper.toGenerationResponse(any())).thenAnswer(invocation -> response(generation.get()));
         when(similarityService.findSimilarForGeneration("prompt")).thenReturn(List.of(similar));
-        doAnswer(invocation -> {
-            invocation.<Runnable>getArgument(0).run();
-            return null;
-        }).when(aiExecutor).execute(any(Runnable.class));
+        var requested = new AtomicReference<TaskGenerationRequestedEvent>();
+        when(taskGenerationEvents.send(any(), any(), any())).thenAnswer(invocation -> {
+            requested.set(invocation.getArgument(2));
+            return CompletableFuture.completedFuture(null);
+        });
 
         generationService.generate(new TaskGenerationRequest("prompt"));
+        generationService.processGeneration(requested.get());
 
         assertThat(generation.get().getStatus()).isEqualTo(TaskGenerationStatus.SIMILAR_TASKS_FOUND);
         verify(aiProvider, never()).generate(any(), any(), any(Double.class));

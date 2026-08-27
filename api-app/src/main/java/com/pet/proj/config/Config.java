@@ -16,7 +16,7 @@ public class Config {
 
     @Bean
     public ObjectMapper objectMapper() {
-        return new ObjectMapper();
+        return new ObjectMapper().findAndRegisterModules();
     }
 
     @Bean(destroyMethod = "close")

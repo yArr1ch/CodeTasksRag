@@ -40,7 +40,7 @@ public class TaskSolutionService {
     private double similarityThreshold;
 
     @Value("${app.solution-similarity.max-results:5}")
-    private int maxResults = 5;
+    private int maxResults;
 
     public List<TaskSolution> findSolutions(UUID taskId, String query) {
         var task = taskRepository.findById(taskId)

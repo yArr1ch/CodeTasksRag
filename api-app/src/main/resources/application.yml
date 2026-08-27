@@ -1,0 +1,99 @@
+spring:
+  application:
+    name: algocoach-api
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    async:
+      request-timeout: 10m
+  http:
+    clients:
+      connect-timeout: 10s
+      read-timeout: 10m
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:ollama,messaging-kafka}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/algocoach}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  datasource:
+    url: ${JDBC_URL:jdbc:postgresql://localhost:5432/algocoach}
+    username: ${JDBC_USERNAME:algocoach}
+    password: ${JDBC_PASSWORD:algocoach}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: algocoach-api
+      auto-offset-reset: earliest
+      max-poll-records: 1
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.pet.proj.contracts
+        max.poll.interval.ms: ${KAFKA_MAX_POLL_INTERVAL_MS:900000}
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  ai:
+    model:
+      chat: ${AI_PROVIDER:ollama}
+      embedding: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        keep-alive: 30m
+        options:
+          model: qwen2.5-coder:7b
+          top-p: 0.8
+          top-k: 20
+          num-ctx: ${OLLAMA_NUM_CTX:16384}
+          num-predict: ${OLLAMA_NUM_PREDICT:8192}
+      embedding:
+        options:
+          model: nomic-embed-text
+    vectorstore:
+      pgvector:
+        initialize-schema: false
+        dimensions: 768
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        table-name: vector_store
+server:
+  port: 8080
+app:
+  ai:
+    max-concurrent-requests: 3
+    deterministic-temperature: 0.0
+    repair-temperature: 0.25
+  task-similarity:
+    threshold: 0.7
+    max-results: 5
+  solution-similarity:
+    threshold: 0.0
+    max-results: 5
+  task-generation:
+    max-attempts: 3
+    knowledge-results: 2
+    timeout: 10m
+  task-hint:
+    knowledge-results: 3
+  knowledge:
+    similarity-threshold: 0.4
+    chunk-size: 500
+    chunk-overlap: 75
+  kafka:
+    topics:
+      submission-created: submission-created
+      submission-completed: submission-completed
+      task-generation-requested: task-generation-requested
+    task-generation-attempts: ${KAFKA_TASK_GENERATION_ATTEMPTS:3}
+  points:
+    pass-reward: 100
+    hint-cost: 10
+    reference-answer-cost: 50

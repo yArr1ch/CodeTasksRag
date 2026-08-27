@@ -1,0 +1,54 @@
+### Generate a task with AI
+POST {{host}}/api/tasks/generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "Create an Java task to reverse a string array, accept array with some words and return array reversed"
+}
+
+### List published tasks
+GET {{host}}/api/tasks
+Accept: application/json
+
+### Get a task
+GET {{host}}/api/tasks/{{taskId}}
+Accept: application/json
+
+### Review a generated draft with AI
+POST {{host}}/api/tasks/{{taskId}}/review
+Accept: application/json
+
+### Get a code-aware task hint
+POST {{host}}/api/tasks/{{taskId}}/hints
+Content-Type: application/json
+
+{
+  "code": "// Write your solution here",
+  "executionFeedback": "No solution has been run yet."
+}
+
+### Publish a task
+POST {{host}}/api/tasks/{{taskId}}/publish
+Accept: application/json
+
+### Reject a task
+POST {{host}}/api/tasks/{{taskId}}/reject
+Accept: application/json
+
+### Reindex task embeddings
+POST {{host}}/api/tasks/embeddings/reindex
+Accept: application/json
+
+### Generate another task with retrieved knowledge context
+POST {{host}}/api/tasks/generate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "prompt": "Create a medium Java task about finding the longest substring without repeating characters using a sliding window"
+}
+
+### Search solutions by approach
+GET {{host}}/api/tasks/{{taskId}}/solutions?query=iterative%20sliding%20window&limit=5
+Accept: application/json

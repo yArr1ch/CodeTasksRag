@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: algocoach-worker
+  datasource:
+    url: ${JDBC_URL:jdbc:postgresql://localhost:5432/algocoach}
+    username: ${JDBC_USERNAME:algocoach}
+    password: ${JDBC_PASSWORD:algocoach}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: algocoach-worker
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.pet.proj.contracts
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      ack-mode: record
+app:
+  kafka:
+    topics:
+      submission-created: submission-created
+      submission-completed: submission-completed
+  execution:
+    docker-image: ${CODE_RUNNER_IMAGE:algocoach-java-runner:25}
+server:
+  port: 8081

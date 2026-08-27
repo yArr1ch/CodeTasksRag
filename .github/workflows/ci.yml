@@ -1,0 +1,405 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend || steps.manual.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend || steps.manual.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker || steps.manual.outputs.docker }}
+
+    steps:
+      - name: Filter pull request paths
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            gradle: &gradle_paths
+              - 'gradle/**'
+              - 'gradlew'
+              - 'gradle.properties'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+            back: &back_paths
+              - 'api-app/**'
+              - 'worker-app/**'
+              - 'shared-contracts/**'
+
+            backend:
+              - *back_paths
+              - *gradle_paths
+            frontend:
+              - 'web/**'
+            docker:
+              - 'Dockerfile*'
+              - *back_paths
+              - *gradle_paths
+
+      - name: Run all areas for manual dispatch
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          {
+            echo "backend=true"
+            echo "frontend=true"
+            echo "docker=true"
+          } >> "$GITHUB_OUTPUT"
+
+  security:
+    name: Security and quality checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+          format: table
+
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint API Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile.api
+
+      - name: Lint worker Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile.worker
+
+      - name: Lint GitHub Actions workflows
+        uses: raven-actions/actionlint@v2
+        with:
+          files: .github/workflows/*.yml,.github/workflows/*.yaml
+
+      - name: Set up Node.js for commitlint
+        if: github.event_name == 'pull_request'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install commitlint dependencies
+        if: github.event_name == 'pull_request'
+        run: npm ci
+
+      - name: Validate pull request commit messages
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from="${{ github.event.pull_request.base.sha }}" --to="${{ github.event.pull_request.head.sha }}"
+
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          # This advisory only affects unstable React Router RSC APIs.
+          # The frontend uses the standard BrowserRouter/Routes APIs.
+          allow-ghsas: GHSA-qwww-vcr4-c8h2
+
+  backend:
+    name: Backend unit and container tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run backend tests
+        run: ./gradlew test --no-daemon
+
+  jacoco:
+    name: Backend test coverage
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run backend tests with JaCoCo
+        run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification --no-daemon
+
+      - name: Upload JaCoCo reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: jacoco-reports
+          path: |
+            api-app/build/reports/jacoco/test/
+            worker-app/build/reports/jacoco/test/
+            shared-contracts/build/reports/jacoco/test/
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: web
+        run: npm run build
+
+  frontend-e2e:
+    name: Frontend Playwright smoke tests
+    runs-on: ubuntu-latest
+    needs: [changes, frontend]
+    if: needs.changes.outputs.frontend == 'true' && needs.frontend.result == 'success'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        working-directory: web
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-results
+          path: web/test-results
+          if-no-files-found: ignore
+
+  docker:
+    name: Build Docker images
+    runs-on: ubuntu-latest
+    needs: [changes, backend, jacoco, frontend, frontend-e2e, security, codeql]
+    if: >-
+      always() &&
+      needs.changes.outputs.docker == 'true' &&
+      needs.backend.result == 'success' &&
+      needs.jacoco.result == 'success' &&
+      needs.security.result == 'success' &&
+      needs.codeql.result == 'success' &&
+      (needs.frontend.result == 'success' || needs.frontend.result == 'skipped') &&
+      (needs['frontend-e2e'].result == 'success' || needs['frontend-e2e'].result == 'skipped')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Package backend applications
+        run: ./gradlew :api-app:bootJar :worker-app:bootJar -x test --no-daemon
+
+      - name: Normalize application JAR names
+        run: |
+          api_jar=$(find api-app/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -print -quit)
+          worker_jar=$(find worker-app/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*-plain.jar' -print -quit)
+          test -n "$api_jar" || { echo "API boot JAR was not produced"; ls -la api-app/build/libs; exit 1; }
+          test -n "$worker_jar" || { echo "Worker boot JAR was not produced"; ls -la worker-app/build/libs; exit 1; }
+          if [ "$api_jar" != "api-app/build/libs/api-app.jar" ]; then cp "$api_jar" api-app/build/libs/api-app.jar; fi
+          if [ "$worker_jar" != "worker-app/build/libs/worker-app.jar" ]; then cp "$worker_jar" worker-app/build/libs/worker-app.jar; fi
+
+      - name: Build API image
+        run: docker build --file Dockerfile.api --tag algocoach-api:ci .
+
+      - name: Build worker image
+        run: docker build --file Dockerfile.worker --tag algocoach-worker:ci .
+
+      - name: Generate API image SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: algocoach-api:ci
+          format: cyclonedx
+          output: api-image-sbom.json
+          exit-code: '0'
+
+      - name: Generate worker image SBOM
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: algocoach-worker:ci
+          format: cyclonedx
+          output: worker-image-sbom.json
+          exit-code: '0'
+
+      - name: Scan API image with Trivy
+        id: trivy-api
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: algocoach-api:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: sarif
+          output: api-image-trivy.sarif
+
+      - name: Scan worker image with Trivy
+        id: trivy-worker
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: algocoach-worker:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: sarif
+          output: worker-image-trivy.sarif
+
+      - name: Upload image SBOMs and scan reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: container-security-reports
+          path: |
+            api-image-sbom.json
+            worker-image-sbom.json
+            api-image-trivy.sarif
+            worker-image-trivy.sarif
+          if-no-files-found: warn
+
+      - name: Enforce image vulnerability policy
+        if: always()
+        run: |
+          api_outcome="${{ steps.trivy-api.outcome }}"
+          worker_outcome="${{ steps.trivy-worker.outcome }}"
+          echo "API image Trivy outcome: $api_outcome"
+          echo "Worker image Trivy outcome: $worker_outcome"
+
+          if [ "$api_outcome" != success ] || [ "$worker_outcome" != success ]; then
+            echo "::error::A fixed HIGH or CRITICAL vulnerability was found in an image. Review the Trivy scan summaries and uploaded SARIF reports."
+            exit 1
+          fi
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java, javascript-typescript]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        if: matrix.language == 'java'
+        run: chmod +x gradlew
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Build Java code for CodeQL
+        if: matrix.language == 'java'
+        run: ./gradlew classes --no-daemon
+
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v4

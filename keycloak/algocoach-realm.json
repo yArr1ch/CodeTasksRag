@@ -1,0 +1,40 @@
+{
+  "realm": "algocoach",
+  "enabled": true,
+  "registrationAllowed": true,
+  "defaultRoles": ["USER"],
+  "roles": {
+    "realm": [
+      {"name": "USER"},
+      {"name": "ADMIN"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "algocoach-web",
+      "name": "AlgoCoach Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "admin", "temporary": false}],
+      "realmRoles": ["USER", "ADMIN"]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{"type": "password", "value": "user", "temporary": false}],
+      "realmRoles": ["USER"]
+    }
+  ]
+}

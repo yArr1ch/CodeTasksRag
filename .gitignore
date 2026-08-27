@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Node.js and frontend build output
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# Playwright output
+web/test-results/
+web/playwright-report/
+web/blob-report/
+
+# Test and coverage output
+coverage/
+*.log
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+allure-results/*
